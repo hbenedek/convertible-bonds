@@ -1,7 +1,8 @@
+from abc import abstractclassmethod
 import numpy as np
 
 
-class Binomial:
+class BinomialModel:
     def __init__(self, name: str, delta: float, T: int, r: float, S_0: float, dividend_dates: float, dividend_yield: float, U: float, D: float):
         self.name = name
         self.delta = delta
@@ -19,7 +20,7 @@ class Binomial:
 
     def calculate_risk_neutral_probabilities(self):
         self.risk_neutral_up = (np.exp(self.r * self.delta) - self.D) / (self.U - self.D)
-        self.risk_neutral_down = self.risk_neutral_up - 1
+        self.risk_neutral_down = 1 - self.risk_neutral_up
 
     def check_arbitrage(self):
         if self.risk_neutral_up < 1 and 0 < self.risk_neutral_up: 
@@ -47,21 +48,30 @@ class Binomial:
         self.riskless_tree = prices
 
 
-class ZeroCouponBond(Binomial):
-    def __init__(self, name: str, maturity: int, face_value: float):
-        super().__init__()
+class Derivative:
+    def __init__(self, name: str, model: BinomialModel):
         self.name = name
+        self.model = model
+
+    @abstractclassmethod
+    def calculate_price():
+        pass
+
+
+class ZeroCouponBond(Derivative):
+    def __init__(self, name: str, maturity: int, face_value: float, model: BinomialModel):
+        super().__init__(name, model)
         self.maturity = maturity
         self.face_value = face_value
+        self.model = None
 
     def calculate_price(self) -> float:
-        return self.face_value * np.exp(self.r * self.delta * self.maturity)
+        return self.face_value * np.exp(self.model.r * self.model.delta * self.maturity)
 
 
-class PlainCouponBond(Binomial):
+class PlainCouponBond(Derivative):
     def __init__(self, name: str, maturity: int, face_value: float, coupon_rate: float):
-        super().__init__()
-        self.name = name
+        super().__init__(name, model)
         self.maturity = maturity
         self.face_value = face_value
         self.coupon_rate = coupon_rate
@@ -69,26 +79,36 @@ class PlainCouponBond(Binomial):
 
     def calculate_price(self) -> float:
         # decompose the bond into zero coupon bonds and principle payments
-        coupons = sum([ZeroCouponBond(f"{self.name}-ZCB-{i}", i ,self.coupon).calculate_price() for i in range(1,self.maturity + 1)])
-        principal = ZeroCouponBond(f"{self.name}-principal-{self.maturity}", self.maturity , self.face_value).calculate_price()
+        coupons = sum([ZeroCouponBond(f"{self.name}-ZCB-{i}", i ,self.coupon, self.model).calculate_price() for i in range(1, self.maturity + 1)])
+        principal = ZeroCouponBond(f"{self.name}-principal-{self.maturity}", self.maturity , self.face_value, self.model).calculate_price()
         return coupons + principal 
 
 
-class EuropeanCall(Binomial):
-    def __init__(self, name, K): 
-        super().__init__()
-        self.name = name
+class EuropeanCall(Derivative):
+    def __init__(self, name, K, model): 
+        super().__init__(name, model)
         self.K = K
+        self.payoff = lambda x: max(0, x - self.K)
+        self.price_tree = None
 
     def calculate_price(self) -> float:
-        pass
+        prices = np.zeros((self.model.T + 1, self.model.T + 1))
+        gamma = np.exp(-self.model.r * self.model.delta)
+        for i in range(self.model.T + 1):
+            prices[self.model.T][i] = self.payoff(self.model.stock_tree[self.model.T][i])
+        for j in range(self.model.T - 1, -1, -1):
+            for i in range(0, j + 1):
+                prices[j][i] = gamma * (self.model.risk_neutral_up * prices[j + 1][i + 1] + self.model.risk_neutral_down * prices[j + 1][i])
+        self.price_tree = prices
+        return self.price_tree[0][0]
+
         
-class EuropeanPut(Binomial):
+class EuropeanPut(Derivative):
     pass
     def calculate_price(self) -> float:
         pass
 
-class MandatoryConvertibleBond(Binomial):
+class MandatoryConvertibleBond:
     pass
     def calculate_price(self) -> float:
         pass
@@ -96,10 +116,11 @@ class MandatoryConvertibleBond(Binomial):
 
 if __name__ == "__main__":
     np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
-    model = Binomial("test", 1, 5, 2, 1, 0, 0, 2, 1/2)
+    model = BinomialModel(name="Lecture4", delta=1, T=3, r=np.log(1.25), S_0=8, dividend_dates=0, dividend_yield=0, U=2, D=1/2)
     model.calculate_risk_neutral_probabilities()
     model.check_arbitrage()
     model.calculate_stock_tree()
-    print(model.stock_tree)
     model.calculate_riskless_tree()
-    print(model.riskless_tree)
+    call = EuropeanCall('test_call', K=40, model=model)
+    call.calculate_price()
+    print(call.price_tree)
