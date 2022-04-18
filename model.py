@@ -70,7 +70,7 @@ class ZeroCouponBond(Derivative):
 
 
 class PlainCouponBond(Derivative):
-    def __init__(self, name: str, maturity: int, face_value: float, coupon_rate: float):
+    def __init__(self, name: str, maturity: int, face_value: float, coupon_rate: float, model: BinomialModel):
         super().__init__(name, model)
         self.maturity = maturity
         self.face_value = face_value
@@ -84,12 +84,16 @@ class PlainCouponBond(Derivative):
         return coupons + principal 
 
 
-class EuropeanCall(Derivative):
-    def __init__(self, name, K, model): 
+class EuropeanOption(Derivative):
+    def __init__(self, name: str, K: float, model: BinomialModel, type_: str): 
         super().__init__(name, model)
         self.K = K
-        self.payoff = lambda x: max(0, x - self.K)
         self.price_tree = None
+        self.type = type_
+        if self.type == 'call':
+            self.payoff = lambda x: max(0, x - self.K)
+        elif self.type == 'put':
+            self.payoff = lambda x: max(0, self.K - x)
 
     def calculate_price(self) -> float:
         prices = np.zeros((self.model.T + 1, self.model.T + 1))
@@ -121,6 +125,7 @@ if __name__ == "__main__":
     model.check_arbitrage()
     model.calculate_stock_tree()
     model.calculate_riskless_tree()
-    call = EuropeanCall('test_call', K=40, model=model)
-    call.calculate_price()
+    call = EuropeanOption('test_call', K=40, model=model, type_ = 'call')
+    x = call.calculate_price()
     print(call.price_tree)
+    print(x)
