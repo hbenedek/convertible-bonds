@@ -63,25 +63,35 @@ class ZeroCouponBond(Derivative):
         super().__init__(name, model)
         self.maturity = maturity
         self.face_value = face_value
-        self.model = None
 
     def calculate_price(self) -> float:
-        return self.face_value * np.exp(self.model.r * self.model.delta * self.maturity)
+        gamma = np.exp(- self.model.r * self.model.delta)
+        mask = np.ones(self.maturity + 1)
+        prices = np.zeros((self.maturity + 1, self.maturity + 1))
+        prices[self.maturity] = self.face_value
+        for i in range(self.maturity-1, -1, -1):
+            mask[i+1:] = 0
+            prices[i] = prices[i + 1] * gamma * mask
+        self.price_tree = prices
+        return self.price_tree[0][0]
 
 
-class PlainCouponBond(Derivative):
+class PlainCouponBond(Derivative): #TODO: add in-between coupon payment dates parameter
     def __init__(self, name: str, maturity: int, face_value: float, coupon_rate: float, model: BinomialModel):
         super().__init__(name, model)
         self.maturity = maturity
         self.face_value = face_value
         self.coupon_rate = coupon_rate
         self.coupon = self.coupon_rate * self.face_value
+        self.price_tree = None
 
     def calculate_price(self) -> float:
         # decompose the bond into zero coupon bonds and principle payments
         coupons = sum([ZeroCouponBond(f"{self.name}-ZCB-{i}", i ,self.coupon, self.model).calculate_price() for i in range(1, self.maturity + 1)])
         principal = ZeroCouponBond(f"{self.name}-principal-{self.maturity}", self.maturity , self.face_value, self.model).calculate_price()
-        return coupons + principal 
+
+        self.price_tree = coupons.price_tree + principal.price_tree
+        return self.price_tree[0][0]
 
 
 class EuropeanOption(Derivative):
@@ -106,16 +116,36 @@ class EuropeanOption(Derivative):
         self.price_tree = prices
         return self.price_tree[0][0]
 
-        
-class EuropeanPut(Derivative):
-    pass
-    def calculate_price(self) -> float:
-        pass
-
 class MandatoryConvertibleBond:
-    pass
+    def __init__(self, name: str, alpha: float, beta: float, model: BinomialModel, face_value: float, coupon_rate: float, coupon_dates):
+        super().__init__(name, model)
+        self.alpha = alpha
+        self.beta = beta
+        self.face_value = face_value
+        self.coupon_rate  = coupon_rate
+        self.coupon_dates = coupon_dates
+        self.call_price_tree = None
+        self.put_price_tree = None
+        self.bond_price_tree = None
+        self.price_tree = None
+
     def calculate_price(self) -> float:
-        pass
+        call = EuropeanOption("call", self.F/self.beta, self.model, "call")
+        put = EuropeanOption("put", self.F/self.alpha, self.model, "put")
+        bond = PlainCouponBond("bond", self.model.T, self.face_value, self.coupon_rate, self.model) 
+        #TODO: now there is a coupon at every in-between date, modify Bonds to have a parameter coupon_dates
+
+        call.calculate_price()
+        put.calculate_price()
+        bond.calculate_price()
+
+        self.call_price_tree = call.price_tree
+        self.call_price_tree = put.price_tree
+        self.call_price_tree = bond.price_tree
+
+        self.price_tree = self.beta * self.call_price_tree - self.alpha * self.put_price_tree + self.bond_price_tree
+        return self.price_tree[0][0]
+        
 
 
 if __name__ == "__main__":
@@ -125,7 +155,12 @@ if __name__ == "__main__":
     model.check_arbitrage()
     model.calculate_stock_tree()
     model.calculate_riskless_tree()
-    call = EuropeanOption('test_call', K=40, model=model, type_ = 'call')
-    x = call.calculate_price()
-    print(call.price_tree)
-    print(x)
+
+    zcb = ZeroCouponBond("zcb",3, 100, model)
+    zcb.calculate_price()
+    print("***")
+    print(zcb.price_tree)
+    #call = EuropeanOption('test_call', K=40, model=model, type_ = 'call')
+    #x = call.calculate_price()
+    #print(call.price_tree)
+    #print(x)
