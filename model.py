@@ -147,6 +147,34 @@ class MandatoryConvertibleBond:
         return self.price_tree[0][0]
         
 
+class AmericanOption(Derivative):
+    def __init__(self, name: str, model: BinomialModel, K: float = 0, payoff: np.ndarray = np.empty(0), type_: str = ""):
+        super().__init__(name, model)
+        self.price_tree = None
+        self.type = type_
+        self.K = K
+        if self.type == 'call':
+            call = lambda x: max(0, x - self.K)
+            self.payoff = np.vectorize(call)(self.model.stock_tree)
+        elif self.type == 'put':
+            put = lambda x: max(0, self.K - x)
+            self.payoff = np.vectorize(put)(self.model.stock_tree)
+        else:
+            self.payoff = payoff
+
+
+    def calculate_price(self) -> float:
+        prices = np.zeros((self.model.T + 1, self.model.T + 1))
+        gamma = np.exp(-self.model.r * self.model.delta)
+        prices[self.model.T] = self.payoff[self.model.T]
+        for j in range(self.model.T - 1, -1, -1):
+            for i in range(0, j + 1):
+                continuation = gamma * (self.model.risk_neutral_up * prices[j + 1][i + 1] + self.model.risk_neutral_down * prices[j + 1][i])
+                prices[j][i] = max(continuation, self.payoff[j][i])
+
+        self.price_tree = prices
+        return self.price_tree[0][0]
+
 
 if __name__ == "__main__":
     np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
@@ -155,12 +183,13 @@ if __name__ == "__main__":
     model.check_arbitrage()
     model.calculate_stock_tree()
     model.calculate_riskless_tree()
-
     zcb = ZeroCouponBond("zcb",3, 100, model)
     zcb.calculate_price()
-    print("***")
     print(zcb.price_tree)
+ 
     #call = EuropeanOption('test_call', K=40, model=model, type_ = 'call')
     #x = call.calculate_price()
     #print(call.price_tree)
+  
     #print(x)
+
