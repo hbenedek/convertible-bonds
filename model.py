@@ -116,7 +116,7 @@ class EuropeanOption(Derivative):
         self.price_tree = prices
         return self.price_tree[0][0]
 
-class MandatoryConvertibleBond:
+class MandatoryConvertibleBond(Derivative):
     def __init__(self, name: str, alpha: float, beta: float, model: BinomialModel, face_value: float, coupon_rate: float, coupon_dates):
         super().__init__(name, model)
         self.alpha = alpha
@@ -140,8 +140,8 @@ class MandatoryConvertibleBond:
         bond.calculate_price()
 
         self.call_price_tree = call.price_tree
-        self.call_price_tree = put.price_tree
-        self.call_price_tree = bond.price_tree
+        self.put_price_tree = put.price_tree
+        self.bond_price_tree = bond.price_tree
 
         self.price_tree = self.beta * self.call_price_tree - self.alpha * self.put_price_tree + self.bond_price_tree
         return self.price_tree[0][0]
@@ -174,6 +174,34 @@ class AmericanOption(Derivative):
 
         self.price_tree = prices
         return self.price_tree[0][0]
+
+class ConvertibleBond(Derivative): 
+    def __init__(self, name: str,  model: BinomialModel, face_value: float, coupon_rate: float, coupon_dates, gamma: float):
+        super().__init__(name, model)
+        self.face_value = face_value
+        self.coupon_rate  = coupon_rate
+        self.coupon_dates = coupon_dates
+        self.gamma = gamma
+        self.call_price_tree = None
+        self.put_price_tree = None
+        self.bond_price_tree = None
+        self.price_tree = None
+
+    def calculate_price(self) -> float:
+        payoff = np.empty(0) # TODO 
+
+        american = AmericanOption("am", model, payoff=payoff)
+        bond = PlainCouponBond("bond", self.model.T, self.face_value, self.coupon_rate, self.model)
+
+        american.calculate_price()
+        bond.calculate_price()
+
+        self.american_price_tree = american.price_tree
+        self.call_price_tree = bond.price_tree
+
+        self.price_tree = self.american_price_tree + self.bond_price_tree
+        return self.price_tree[0][0]
+
 
 
 if __name__ == "__main__":
