@@ -5,7 +5,7 @@ import numpy as np
 class TestSum(unittest.TestCase):
 
     def test_zcb(self):
-        model = BinomialModel(name="Lecture4", delta=1, T=3, r=np.log(1.25), S_0=8, dividend_dates=0, dividend_yield=0, U=2, D=1/2)
+        model = BinomialModel(name="Lecture4", delta=1, T=3, r=np.log(1.25), S_0=8, dividend_dates=[], dividend_yield=0, U=2, D=1/2)
         model.calculate_risk_neutral_probabilities()
         model.calculate_riskless_tree()
         
@@ -15,7 +15,7 @@ class TestSum(unittest.TestCase):
     
 
     def test_european_call(self):
-        model = BinomialModel(name="Lecture3", delta=1, T=3, r=np.log(1.25), S_0=8, dividend_dates=0, dividend_yield=0, U=2, D=1/2)
+        model = BinomialModel(name="Lecture3", delta=1, T=3, r=np.log(1.25), S_0=8, dividend_dates=[], dividend_yield=0, U=2, D=1/2)
         model.calculate_risk_neutral_probabilities()
         model.calculate_stock_tree()
         model.calculate_riskless_tree()
@@ -26,7 +26,7 @@ class TestSum(unittest.TestCase):
 
 
     def test_american_put(self):
-        model = BinomialModel(name="Lecture4", delta=1, T=2, r=np.log(1.25), S_0=4, dividend_dates=0, dividend_yield=0, U=2, D=1/2)
+        model = BinomialModel(name="Lecture4", delta=1, T=2, r=np.log(1.25), S_0=4, dividend_dates=[], dividend_yield=0, U=2, D=1/2)
         model.calculate_risk_neutral_probabilities()
         model.calculate_stock_tree()
         model.calculate_riskless_tree()

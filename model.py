@@ -3,13 +3,13 @@ import numpy as np
 
 
 class BinomialModel:
-    def __init__(self, name: str, delta: float, T: int, r: float, S_0: float, dividend_dates: float, dividend_yield: float, U: float, D: float):
+    def __init__(self, name: str, delta: float, T: int, r: float, S_0: float, dividend_dates: list, dividend_yield: float, U: float, D: float):
         self.name = name
         self.delta = delta
         self.T = T
         self.r = r
         self.S_0 = S_0
-        self.dividend_rates = dividend_dates
+        self.dividend_dates = dividend_dates
         self.dividend_yield = dividend_yield
         self.U = U
         self.D = D
@@ -32,9 +32,13 @@ class BinomialModel:
         prices = np.zeros((self.T + 1, self.T + 1))
         prices[0][0] = self.S_0
         for i in range(1, self.T + 1):
+            delta_i = self.dividend_yield if (i in self.dividend_dates) else 0          # Dividend yield at date i.
+            
             for j in range(0,i):
-                prices[i][j] = prices[i - 1][j] * self.U
-            prices[i][i] = prices[i - 1][i - 1] * self.D
+                Sc_i = prices[i - 1][j] * self.U                                        # Cum-value.
+                prices[i][j] = Sc_i*(1 - delta_i)                                       # Ex-dividend value.
+            Sc_i = prices[i - 1][i - 1] * self.D
+            prices[i][i] = Sc_i*(1 - delta_i)
         self.stock_tree = prices
 
     def calculate_riskless_tree(self):
