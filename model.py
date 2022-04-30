@@ -80,26 +80,27 @@ class ZeroCouponBond(Derivative):
         return self.price_tree[0][0]
 
 
-class PlainCouponBond(Derivative): #TODO: add in-between coupon payment dates parameter
-    def __init__(self, name: str, maturity: int, face_value: float, coupon_rate: float, model: BinomialModel, coupon_dates: list=[]):
+class PlainCouponBond(Derivative):
+    def __init__(self, name: str, maturity: int, face_value: float, coupon_rate: float, coupon_dates: list, model: BinomialModel):
         super().__init__(name, model)
         self.maturity = maturity
         self.face_value = face_value
         self.coupon_rate = coupon_rate
-        if coupon_dates == []:
-            self.coupon_dates = [t for t in range(1, self.maturity + 1)]
-        else:
-            self.coupon_dates = coupon_dates
+        self.coupon_dates = coupon_dates
         self.coupon = self.coupon_rate * self.face_value
         self.price_tree = None
 
     def calculate_price(self) -> float:
-        prices = np.zeros((self.model.T + 1, self.model.T + 1))
+        prices = np.zeros((self.maturity + 1, self.maturity + 1))
+
         # decompose the bond into zero coupon bonds and principle payments
         coupons = [ZeroCouponBond(f"{self.name}-ZCB-{i}", i ,self.coupon, self.model) for i in self.coupon_dates]
+        
         for coupon in coupons:
             coupon.calculate_price()
-            prices += coupon.price_tree
+            tmp = coupon.price_tree
+            tmp[-1,:] = 0               # Mask the prices at maturity (in order to get the ex-coupon prices). Comment this line in order to get cum-coupon prices.
+            prices += np.pad(coupon.price_tree, [(0, prices.shape[0] - coupon.price_tree.shape[0]), (0, prices.shape[1] - coupon.price_tree.shape[1])], mode='constant')
 
         principal = ZeroCouponBond(f"{self.name}-principal-{self.maturity}", self.maturity , self.face_value, self.model)
         principal.calculate_price()
@@ -324,6 +325,9 @@ if __name__ == "__main__":
 
     bond = PlainCouponBond('test', 2, 100, 0.03, model)
     bond.calculate_price()
+    cb = PlainCouponBond("cb", 3, 1, 0.05, model, [1,2,3])
+    print(cb.calculate_price())
+    print(cb.price_tree)
     
 
     #cCB = callableCB('test_cCB', model=model, face_value=20, coupon_rate=0.02, coupon_dates=[1,2], gamma=10, call_price=21)
