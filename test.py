@@ -35,5 +35,16 @@ class TestSum(unittest.TestCase):
         x = put.calculate_price()
         self.assertEqual(x, 1.36)
 
+
+    def test_convertibleCB(self):
+        model = BinomialModel(name="Lecture6", delta=1, T=2, r=np.log(1.25), S_0=4, dividend_dates=[1], dividend_yield=0.25, U=2, D=1/2)
+        model.calculate_risk_neutral_probabilities()
+        model.calculate_stock_tree()
+        model.calculate_riskless_tree()
+
+        cCB = callableCB('test_cCB', model=model, face_value=20, coupon_rate=0.02, coupon_dates=[1,2], gamma=10, call_price=21)
+        B0 = cCB.calculate_price()
+        self.assertEqual(B0, 40)
+
 if __name__ == '__main__':
     unittest.main()

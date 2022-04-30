@@ -207,17 +207,107 @@ class ConvertibleBond(Derivative):
         return self.price_tree[0][0]
 
 
+class action:
+    def __init__(self, date: int, actor: str, stock_value: float):
+        self.date = date
+        self.actor = actor
+        self.stock_value = stock_value
+    
+    def describe(self) -> str:
+        description = "\nAt date t = {0}, if the share price S_t = {1}\n".format(self.date, self.stock_value)
+        if (self.actor == "both"):
+            description += "   The issuer should call the bond and the bondholder should exercise the conversion option.\n"
+        elif (self.actor == "bondholder"):
+            description += "   The {} should exercise the conversion option.\n".format(self.actor)   
+        else:
+            description += "   The {} should exercise the call option.\n".format(self.actor)
+        return description
+
+
+class callableCB(Derivative):
+    def __init__(self, name: str,  model: BinomialModel, face_value: float, coupon_rate: float, coupon_dates: list, gamma: float, call_price: float):
+        super().__init__(name, model)
+        self.face_value = face_value
+        self.coupon_rate = coupon_rate
+        self.coupon_dates = coupon_dates
+        self.gamma = gamma                                                                              # Conversion rate.
+        self.call_price = call_price
+        self.price_tree = None
+        self.strategies = []
+
+    def calculate_price(self) -> float:
+        self.price_tree = np.zeros((self.model.T + 1, self.model.T + 1))
+
+        # Calculate payoff at maturity
+        for i in range(self.model.T+1):
+            S_T = self.model.stock_tree[self.model.T][i]
+
+            if (self.face_value > max(self.gamma*S_T, self.call_price)):
+                price = max(self.gamma*S_T, self.call_price) 
+                self.price_tree[self.model.T][i] = price                                                # Update price tree.
+
+                # Update strategies list.
+                if price == self.gamma*S_T:     self.strategies.append(action(self.model.T, "both", S_T))
+                else:                           self.strategies.append(action(self.model.T, "issuer", S_T))
+            else:
+                price = max(self.gamma*S_T, self.face_value)
+                self.price_tree[self.model.T][i] = price
+
+                # Update strategies list.
+                if price == self.gamma*S_T:     self.strategies.append(action(self.model.T, "bondholder", S_T))
+        
+        for i in range(self.model.T - 1, -1, -1):
+            coupon_i = self.coupon_rate*self.face_value if ((i+1) in self.coupon_dates) else 0          # Coupon payment at date j.
+            for j in range(i+1):
+                S_i = self.model.stock_tree[i][j]                                                       # i-th value of stock at date j.
+                # Continuation value.
+                C_i = np.exp(-self.model.r * self.model.delta)*(self.model.risk_neutral_up*self.price_tree[i+1][j] + self.model.risk_neutral_down*self.price_tree[i+1][j+1] + coupon_i)
+
+                if ((i in self.coupon_dates) and (C_i > max(self.gamma*S_i, self.call_price))):
+                    price = max(self.gamma*S_i, self.call_price)
+                    self.price_tree[i][j] = price
+
+                    if price == self.gamma*S_i: self.strategies.append(action(i, "both", S_i))
+                    else:                       self.strategies.append(action(i, "issuer", S_i))
+
+                else:
+                    price = max(self.gamma*S_i, C_i)
+                    self.price_tree[i][j] = price
+                    
+                    if price == self.gamma*S_i:     self.strategies.append(action(i, "bondholder", S_i))
+
+        return self.price_tree[0][0]
+        
+    def describe_strategies(self) -> str:
+        descriptions = '\n\nN.B. In principle, only the first occurrence (of the exercise of the call and/or conversion option) should be taken into account. '
+        descriptions += 'However, we list "subsequent" strategies, in case the first one is not followed (e.g. case where the bondholder decided to continue, even if it was not the optimal decision).\n'
+        for i in range(len(self.strategies)-1, -1, -1):
+            descriptions += self.strategies[i].describe()
+
+        return descriptions
+
+
+
+
 
 if __name__ == "__main__":
     np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
-    model = BinomialModel(name="Lecture4", delta=1, T=3, r=np.log(1.25), S_0=8, dividend_dates=0, dividend_yield=0, U=2, D=1/2)
+    model = BinomialModel(name="Lecture4", delta=1, T=2, r=np.log(1.25), S_0=4, dividend_dates=[1], dividend_yield=0.25, U=2, D=1/2)
     model.calculate_risk_neutral_probabilities()
     model.check_arbitrage()
     model.calculate_stock_tree()
     model.calculate_riskless_tree()
+    
+    """
     zcb = ZeroCouponBond("zcb",3, 100, model)
     zcb.calculate_price()
     print(zcb.price_tree)
+    """
+
+    cCB = callableCB('test_cCB', model=model, face_value=20, coupon_rate=0.02, coupon_dates=[1,2], gamma=10, call_price=21)
+    B0 = cCB.calculate_price()
+    print(cCB.price_tree)
+    print(cCB.describe_strategies())
  
     #call = EuropeanOption('test_call', K=40, model=model, type_ = 'call')
     #x = call.calculate_price()
