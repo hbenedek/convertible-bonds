@@ -186,14 +186,20 @@ class ConvertibleBond(Derivative):
         self.coupon_rate  = coupon_rate
         self.coupon_dates = coupon_dates
         self.gamma = gamma
-        self.call_price_tree = None
-        self.put_price_tree = None
+        self.american_price_tree = None
         self.bond_price_tree = None
         self.price_tree = None
 
     def calculate_price(self) -> float:
-        payoff = np.empty(0) # TODO 
+        # calculate payoff
+        payoff = np.zeros(self.model.T) 
+        payoff[self.model.T] = np.maximum(self.face_value, self.gamma*self.model.stock_tree[self.model.T])
+        for i in range(self.model.T): 
+            vtB = PlainCouponBond("coup", self.model.T-i, self.face_value, self.coupon_rate, self.model)
+            vtB_price = vtB.calculate_price()
+            payoff[i] = self.gamma*self.model.stock_tree[self.model.T] - vtB_price
 
+        # replicating portfolio
         american = AmericanOption("am", model, payoff=payoff)
         bond = PlainCouponBond("bond", self.model.T, self.face_value, self.coupon_rate, self.model)
 
@@ -201,8 +207,9 @@ class ConvertibleBond(Derivative):
         bond.calculate_price()
 
         self.american_price_tree = american.price_tree
-        self.call_price_tree = bond.price_tree
+        self.bond_price_tree = bond.price_tree
 
+        # calculate price
         self.price_tree = self.american_price_tree + self.bond_price_tree
         return self.price_tree[0][0]
 
