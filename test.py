@@ -13,6 +13,14 @@ class TestSum(unittest.TestCase):
         x = zcb.calculate_price()
         self.assertAlmostEqual(x, 51.2)
     
+    def test_coupon_bond(self):
+        model = BinomialModel(name="Lecture4", delta=1, T=2, r=np.log(1.25), S_0=4, dividend_dates=[1], dividend_yield=0.25, U=2, D=1/2)
+        model.calculate_risk_neutral_probabilities()
+        model.calculate_riskless_tree()
+
+        bond = PlainCouponBond('bond', 2, 100, 0.03, model)
+        x = bond.calculate_price()
+        self.assertAlmostEqual(x, 68.32)
 
     def test_european_call(self):
         model = BinomialModel(name="Lecture3", delta=1, T=3, r=np.log(1.25), S_0=8, dividend_dates=[], dividend_yield=0, U=2, D=1/2)

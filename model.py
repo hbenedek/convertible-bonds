@@ -70,31 +70,42 @@ class ZeroCouponBond(Derivative):
 
     def calculate_price(self) -> float:
         gamma = np.exp(- self.model.r * self.model.delta)
-        mask = np.ones(self.maturity + 1)
-        prices = np.zeros((self.maturity + 1, self.maturity + 1))
+        mask = np.ones(self.model.T + 1)
+        prices = np.zeros((self.model.T + 1, self.model.T + 1))
         prices[self.maturity] = self.face_value
         for i in range(self.maturity-1, -1, -1):
-            mask[i+1:] = 0
+            mask[i+1:self.maturity] = 0
             prices[i] = prices[i + 1] * gamma * mask
         self.price_tree = prices
         return self.price_tree[0][0]
 
 
 class PlainCouponBond(Derivative): #TODO: add in-between coupon payment dates parameter
-    def __init__(self, name: str, maturity: int, face_value: float, coupon_rate: float, model: BinomialModel):
+    def __init__(self, name: str, maturity: int, face_value: float, coupon_rate: float, model: BinomialModel, coupon_dates: list=[]):
         super().__init__(name, model)
         self.maturity = maturity
         self.face_value = face_value
         self.coupon_rate = coupon_rate
+        if coupon_dates == []:
+            self.coupon_dates = [t for t in range(1, self.maturity + 1)]
+        else:
+            self.coupon_dates = coupon_dates
         self.coupon = self.coupon_rate * self.face_value
         self.price_tree = None
 
     def calculate_price(self) -> float:
+        prices = np.zeros((self.model.T + 1, self.model.T + 1))
         # decompose the bond into zero coupon bonds and principle payments
-        coupons = sum([ZeroCouponBond(f"{self.name}-ZCB-{i}", i ,self.coupon, self.model).calculate_price() for i in range(1, self.maturity + 1)])
-        principal = ZeroCouponBond(f"{self.name}-principal-{self.maturity}", self.maturity , self.face_value, self.model).calculate_price()
+        coupons = [ZeroCouponBond(f"{self.name}-ZCB-{i}", i ,self.coupon, self.model) for i in self.coupon_dates]
+        for coupon in coupons:
+            coupon.calculate_price()
+            prices += coupon.price_tree
 
-        self.price_tree = coupons.price_tree + principal.price_tree
+        principal = ZeroCouponBond(f"{self.name}-principal-{self.maturity}", self.maturity , self.face_value, self.model)
+        principal.calculate_price()
+        prices += principal.price_tree
+
+        self.price_tree = prices
         return self.price_tree[0][0]
 
 
@@ -311,10 +322,14 @@ if __name__ == "__main__":
     print(zcb.price_tree)
     """
 
-    cCB = callableCB('test_cCB', model=model, face_value=20, coupon_rate=0.02, coupon_dates=[1,2], gamma=10, call_price=21)
-    B0 = cCB.calculate_price()
-    print(cCB.price_tree)
-    print(cCB.describe_strategies())
+    bond = PlainCouponBond('test', 2, 100, 0.03, model)
+    bond.calculate_price()
+    
+
+    #cCB = callableCB('test_cCB', model=model, face_value=20, coupon_rate=0.02, coupon_dates=[1,2], gamma=10, call_price=21)
+    #B0 = cCB.calculate_price()
+    #print(cCB.price_tree)
+    #print(cCB.describe_strategies())
  
     #call = EuropeanOption('test_call', K=40, model=model, type_ = 'call')
     #x = call.calculate_price()
