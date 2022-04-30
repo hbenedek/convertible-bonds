@@ -147,10 +147,9 @@ class MandatoryConvertibleBond(Derivative):
         self.price_tree = None
 
     def calculate_price(self) -> float:
-        call = EuropeanOption("call", self.F/self.beta, self.model, "call")
-        put = EuropeanOption("put", self.F/self.alpha, self.model, "put")
-        bond = PlainCouponBond("bond", self.model.T, self.face_value, self.coupon_rate, self.model) 
-        #TODO: now there is a coupon at every in-between date, modify Bonds to have a parameter coupon_dates
+        call = EuropeanOption("call", self.face_value/self.beta, self.model, "call")
+        put = EuropeanOption("put", self.face_value/self.alpha, self.model, "put")
+        bond = PlainCouponBond("bond", self.model.T, self.face_value, self.coupon_rate, self.coupon_dates, self.model) 
 
         call.calculate_price()
         put.calculate_price()

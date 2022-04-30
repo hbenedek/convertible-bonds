@@ -18,7 +18,7 @@ class TestSum(unittest.TestCase):
         model.calculate_risk_neutral_probabilities()
         model.calculate_riskless_tree()
 
-        bond = PlainCouponBond('bond', 2, 100, 0.03, model)
+        bond = PlainCouponBond('bond', 2, 100, 0.03, [1,2], model)
         x = bond.calculate_price()
         self.assertAlmostEqual(x, 68.32)
 
