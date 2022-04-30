@@ -67,14 +67,15 @@ class ZeroCouponBond(Derivative):
         super().__init__(name, model)
         self.maturity = maturity
         self.face_value = face_value
+        self.price_tree = None
 
     def calculate_price(self) -> float:
         gamma = np.exp(- self.model.r * self.model.delta)
-        mask = np.ones(self.model.T + 1)
-        prices = np.zeros((self.model.T + 1, self.model.T + 1))
+        mask = np.ones(self.maturity + 1)
+        prices = np.zeros((self.maturity + 1, self.maturity + 1))
         prices[self.maturity] = self.face_value
         for i in range(self.maturity-1, -1, -1):
-            mask[i+1:self.maturity] = 0
+            mask[i+1:] = 0
             prices[i] = prices[i + 1] * gamma * mask
         self.price_tree = prices
         return self.price_tree[0][0]
@@ -323,9 +324,9 @@ if __name__ == "__main__":
     print(zcb.price_tree)
     """
 
-    bond = PlainCouponBond('test', 2, 100, 0.03, model)
-    bond.calculate_price()
-    cb = PlainCouponBond("cb", 3, 1, 0.05, model, [1,2,3])
+    #bond = PlainCouponBond('test', 2, 100, 0.03, model)
+    #bond.calculate_price()
+    cb = PlainCouponBond("cb", 3, 1, 0.05, [1,2,3], model)
     print(cb.calculate_price())
     print(cb.price_tree)
     
