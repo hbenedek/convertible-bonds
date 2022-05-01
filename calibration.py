@@ -29,14 +29,15 @@ print(r)
 
 # caluculate delta
 x = PVdividend / S_0
-delta = x / (1-x)
+delta = x / (1+x)
 print(delta)
 
 # calibrate model
 # 60 one-month period, p = 1/2
 
-D = np.exp(r/12) - np.sqrt(np.exp(r/6)-1)  
+D = np.exp(r/12) - np.sqrt(np.exp(r/6) - 1)  
 U = 1/D
+print(D)
 print(U)
 
 BinomialModel("Johnson", delta=1/12, T=60, r=r, S_0=S_0, dividend_dates=[12,24,36,48,60], dividend_yield=delta, U=U, D=D)

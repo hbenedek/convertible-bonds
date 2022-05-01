@@ -1,5 +1,6 @@
 from abc import abstractclassmethod
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class BinomialModel:
@@ -305,13 +306,21 @@ class callableCB(Derivative):
 
         return descriptions
 
+    def question_5_3(self) -> str:
+        descriptions = ""
+        for i in range(len(self.strategies)-1, -1, -1):
+            if self.strategies[i].date in [6, 12, 18]:
+                descriptions += self.strategies[i].describe()
+        
+        return descriptions
+
 
 
 
 
 if __name__ == "__main__":
     np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
-    model = BinomialModel(name="Lecture4", delta=1, T=2, r=np.log(1.25), S_0=4, dividend_dates=[1], dividend_yield=0.25, U=2, D=1/2)
+    model = BinomialModel(name="Lecture4", delta=1/12, T=60, r=0.05, S_0=175, dividend_dates=[12, 24, 36, 48, 60], dividend_yield=0.0287, U=1.0957, D=0.9127)
     model.calculate_risk_neutral_probabilities()
     model.check_arbitrage()
     model.calculate_stock_tree()
@@ -325,19 +334,34 @@ if __name__ == "__main__":
 
     #bond = PlainCouponBond('test', 2, 100, 0.03, model)
     #bond.calculate_price()
-    cb = PlainCouponBond("cb", 3, 1, 0.05, [1,2,3], model)
-    print(cb.calculate_price())
-    print(cb.price_tree)
+    #cb = PlainCouponBond("cb", 3, 1, 0.05, [1,2,3], model)
+    # print(cb.calculate_price())
+    # print(cb.price_tree)
     
 
-    #cCB = callableCB('test_cCB', model=model, face_value=20, coupon_rate=0.02, coupon_dates=[1,2], gamma=10, call_price=21)
-    #B0 = cCB.calculate_price()
-    #print(cCB.price_tree)
-    #print(cCB.describe_strategies())
+    cCB = callableCB('test_cCB', model=model, face_value=1000, coupon_rate=0.02, coupon_dates=[6, 12, 18, 24, 30, 36, 42, 48, 54, 60], gamma=4, call_price=1050)
+    B0 = cCB.calculate_price()
+    print(B0)
+    #print(cCB.question_5_3())
  
-    #call = EuropeanOption('test_call', K=40, model=model, type_ = 'call')
-    #x = call.calculate_price()
-    #print(call.price_tree)
-  
-    #print(x)
+    # Question 5.4.
+    cCB_prices = []
+    for c in np.linspace(0.01, 0.99, num=100):
+        cCB_prices.append(callableCB('', model=model, face_value=1000, coupon_rate=c, coupon_dates=[6, 12, 18, 24, 30, 36, 42, 48, 54, 60], gamma=4, call_price=1050).calculate_price())
+    
+    plt.plot(np.linspace(0.01, 0.99, num=100), cCB_prices)
+    plt.xlabel("coupon rate c")
+    plt.ylabel("Initial price of the cCB")
+    plt.grid()
+    plt.show()
+    
+    cCB_prices = []
+    for gamma_ in np.linspace(0.01, 30, num=100):
+        cCB_prices.append(callableCB('', model=model, face_value=1000, coupon_rate=0.02, coupon_dates=[6, 12, 18, 24, 30, 36, 42, 48, 54, 60], gamma=gamma_, call_price=1050).calculate_price())
+    
+    plt.plot(np.linspace(0.01, 30, num=100), cCB_prices)
+    plt.xlabel("conversion rate gamma")
+    plt.ylabel("Initial price of the cCB")
+    plt.grid()
+    plt.show() 
 
