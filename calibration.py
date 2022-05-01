@@ -36,7 +36,7 @@ print("Value of delta:")
 print(delta)
 
 # calibrate model
-# 60 one-month period, p = 1/2
+# 60 one-month period, q = 1/2
 
 D = np.exp(r/12) - np.sqrt(np.exp(r/6) - 1)  
 U = 1/D
