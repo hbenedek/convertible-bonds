@@ -215,19 +215,20 @@ class ConvertibleBond(Derivative):
 
     def calculate_price(self) -> float:
         # calculate payoff
-        payoff = np.zeros(self.model.T) 
-        payoff[self.model.T] = np.maximum(self.face_value, self.gamma*self.model.stock_tree[self.model.T])
-        for i in range(self.model.T): 
-            vtB = PlainCouponBond("coup", self.model.T-i, self.face_value, self.coupon_rate, self.model)
-            vtB_price = vtB.calculate_price()
-            payoff[i] = self.gamma*self.model.stock_tree[self.model.T] - vtB_price
+        payoff = np.zeros((self.model.T + 1, self.model.T + 1)) 
+        payoff[self.model.T] = np.maximum(self.face_value, self.gamma * self.model.stock_tree[self.model.T])
 
-        # replicating portfolio
-        american = AmericanOption("am", model, payoff=payoff)
-        bond = PlainCouponBond("bond", self.model.T, self.face_value, self.coupon_rate, self.model)
-
-        american.calculate_price()
+        bond = PlainCouponBond("bond", self.model.T, self.face_value, self.coupon_rate, self.coupon_dates, self.model)
         bond.calculate_price()
+
+        for j in range(self.model.T - 1, -1, -1):
+            for i in range(0, j + 1):
+                payoff[j][i] = self.gamma*self.model.stock_tree[j][i] - bond.price_tree[j][i]
+
+
+        american = AmericanOption("am", model, payoff=payoff)
+        american.calculate_price()
+       
 
         self.american_price_tree = american.price_tree
         self.bond_price_tree = bond.price_tree
@@ -383,15 +384,14 @@ if __name__ == "__main__":
     #mCB = MandatoryConvertibleBond('', model=model, alpha=ALPHA, beta=BETA, face_value=F, coupon_rate=COUPON_RATE, coupon_dates=[6, 12, 18, 24, 30, 36, 42, 48, 54, 60])
     #print(mCB.calculate_price())
 
-    #CB = ConvertibleBond('', model=model, face_value=F, coupon_rate=COUPON_RATE, coupon_dates=[6, 12, 18, 24, 30, 36, 42, 48, 54, 60], gamma=GAMMA) 
-    #print(CB.calculate_price())
+    CB = ConvertibleBond('', model=model, face_value=F, coupon_rate=COUPON_RATE, coupon_dates=[6, 12, 18, 24, 30, 36, 42, 48, 54, 60], gamma=GAMMA) 
+    print(CB.calculate_price())
 
-    cCB = callableCB('', model=model, face_value=F, coupon_rate=COUPON_RATE, coupon_dates=[6, 12, 18, 24, 30, 36, 42, 48, 54, 60], gamma=GAMMA, call_price=F_C)
-    B0 = cCB.calculate_price()
-    print(B0)
+    #cCB = callableCB('', model=model, face_value=F, coupon_rate=COUPON_RATE, coupon_dates=[6, 12, 18, 24, 30, 36, 42, 48, 54, 60], gamma=GAMMA, call_price=F_C)
+    #B0 = cCB.calculate_price()
+    #print(B0)
 
-
-    # Question 5.2.
+       # Question 5.2.
     #TODO:
 
 
@@ -477,3 +477,4 @@ if __name__ == "__main__":
     ax.set_ylabel(r"Call price rate $\frac{F_c}{F}$")
     ax.set_zlabel(r"Conversion rate $\gamma$")
     plt.show()
+
