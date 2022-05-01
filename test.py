@@ -2,7 +2,7 @@ import unittest
 from model import *
 import numpy as np
 
-class TestSum(unittest.TestCase):
+class Test(unittest.TestCase):
 
     def test_zcb(self):
         model = BinomialModel(name="Lecture4", delta=1, T=3, r=np.log(1.25), S_0=8, dividend_dates=[], dividend_yield=0, U=2, D=1/2)
@@ -43,6 +43,27 @@ class TestSum(unittest.TestCase):
         x = put.calculate_price()
         self.assertEqual(x, 1.36)
 
+
+    def test_mCB(self):
+        model = BinomialModel(name="Lecture6", delta=1, T=1, r=np.log(1.25), S_0=4, dividend_dates=[], dividend_yield=0.25, U=2, D=1/2)
+        model.calculate_risk_neutral_probabilities()
+        model.calculate_stock_tree()
+        model.calculate_riskless_tree()
+        
+        mCB = MandatoryConvertibleBond('',alpha=100,beta=5,model=model,face_value=20, coupon_rate=0.02, coupon_dates=[1]) 
+        x = mCB.calculate_price()
+        self.assertAlmostEqual(x, 24.32)
+
+
+    def test_CB(self):
+        model = BinomialModel(name="Lecture6", delta=1, T=1, r=np.log(1.25), S_0=4, dividend_dates=[], dividend_yield=0.25, U=2, D=1/2)
+        model.calculate_risk_neutral_probabilities()
+        model.calculate_stock_tree()
+        model.calculate_riskless_tree()
+
+        CB = ConvertibleBond('', model=model, face_value=20, coupon_rate=0.02, coupon_dates=[1], gamma=10) 
+        x = CB.calculate_price()
+        self.assertAlmostEqual(x, 40.320) 
 
     def test_convertibleCB(self):
         model = BinomialModel(name="Lecture6", delta=1, T=2, r=np.log(1.25), S_0=4, dividend_dates=[1], dividend_yield=0.25, U=2, D=1/2)
