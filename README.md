@@ -26,5 +26,5 @@ In order to reproduce our results for the Analysis (Part 5) one should just run 
 ├─── data.txt : Historical data on Johnson & Johnson option prices
 ├─── README.md 
 ├─── .gitignore  
-└─── description.pdf : contains all specifications and questions of the project
+└─── description.pdf : Contains all specifications and questions of the project
 </pre>
