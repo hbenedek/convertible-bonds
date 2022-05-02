@@ -1,19 +1,39 @@
 from abc import abstractclassmethod
 import numpy as np
-import matplotlib.pyplot as plt
-
-
-# Constants definition (Bonds).
-ALPHA = 1000
-BETA = 4
-GAMMA = 4       # Conversion rate.
-COUPON_RATE = 0.02
-COUPON_DATES = [6, 12, 18, 24, 30, 36, 42, 48, 54, 60]
-F = 1000
-F_C = 1.05*F    # Call price.
-
 
 class BinomialModel:
+    """ 
+    Class to represent a Binomial Model.
+
+    Attributes
+    ----------
+    name: name of the model
+    delta:  length of a period
+    T: number of periods in the model
+    r: risk free interest rate
+    S_0: initial price of the stock
+    dividend_dates: list containing the dates where dividend paid out
+    dividend_yield: fraction of the stock price paid as dividend at div dates
+    U: multiplicative up factor
+    D: multiplicative down factor
+    risk_neutral_up: probability of up move under risk neutral measure
+    risk_neutral_down: probability of down move under risk neutral measure
+    stock_tree: price evolution of the stock 
+    riskless_tree: price evolution of the riskless asset
+
+    Methods
+    ----------
+    calculate_risk_neutral_probabilities()
+    check_arbitrage()
+    calculate_stock_tree()
+    calculate_riskless_tree()
+
+    Example of stock price evolution with initial price S_0=4 and T=2 periods. A numpy nd.array is stored in stock_tree attribute, 
+    can be calculated by calling calculate_stock_tree() function
+    [[4.000 0.000 0.000]
+    [8.000 2.000 0.000]
+    [16.000 4.000 1.000]]
+    """
     def __init__(self, name: str, delta: float, T: int, r: float, S_0: float, dividend_dates: list, dividend_yield: float, U: float, D: float):
         self.name = name
         self.delta = delta
@@ -43,11 +63,12 @@ class BinomialModel:
         prices = np.zeros((self.T + 1, self.T + 1))
         prices[0][0] = self.S_0
         for i in range(1, self.T + 1):
-            delta_i = self.dividend_yield if (i in self.dividend_dates) else 0          # Dividend yield at date i.
+            # Dividend yield at date i.
+            delta_i = self.dividend_yield if (i in self.dividend_dates) else 0         
             
             for j in range(0,i):
-                Sc_i = prices[i - 1][j] * self.U                                        # Cum-value.
-                prices[i][j] = Sc_i*(1 - delta_i)                                       # Ex-dividend value.
+                Sc_i = prices[i - 1][j] * self.U       # Cum-value.
+                prices[i][j] = Sc_i*(1 - delta_i)      # Ex-dividend value.
             Sc_i = prices[i - 1][i - 1] * self.D
             prices[i][i] = Sc_i*(1 - delta_i)
         self.stock_tree = prices
@@ -64,9 +85,25 @@ class BinomialModel:
 
 
 class Derivative:
+    """ 
+    Abstract parent class for all financial derivatives, all derivatives should have an underlying Binomial Model and a function, which 
+    calculates its initial price along with its price tree
+
+    Attributes
+    ----------
+    name: name of the derivative
+    model: underlying Binomial Model instance
+    price_tree: numpy ndarray containing the price evolution
+
+    Methods
+    ----------
+    calculate_price() 
+    
+    """
     def __init__(self, name: str, model: BinomialModel):
         self.name = name
         self.model = model
+        self.price_tree = None
 
     @abstractclassmethod
     def calculate_price():
@@ -74,11 +111,25 @@ class Derivative:
 
 
 class ZeroCouponBond(Derivative):
+    """ 
+    Class for ZCB 
+
+    Attributes
+    ----------
+    name: name of the derivative
+    maturity: maturity date of the bond
+    face_value: face value of the bond
+    model: underlying Binomial Model instance
+    price_tree: numpy ndarray containing the price evolution
+
+    Methods
+    ----------
+    calculate_price() 
+    """
     def __init__(self, name: str, maturity: int, face_value: float, model: BinomialModel):
         super().__init__(name, model)
         self.maturity = maturity
         self.face_value = face_value
-        self.price_tree = None
 
     def calculate_price(self) -> float:
         gamma = np.exp(- self.model.r * self.model.delta)
@@ -93,6 +144,24 @@ class ZeroCouponBond(Derivative):
 
 
 class PlainCouponBond(Derivative):
+    """ 
+    Class for Coupon Bonds 
+
+    Attributes
+    ----------
+    name: name of the derivative
+    maturity: maturity date of the bond
+    face_value: face value of the bond
+    model: underlying Binomial Model instance
+    coupon_rate: fraction of the principal value
+    coupon_dates: list containing the dates where coupons are paid out
+    coupon: value of the coupon = FV * cr
+    price_tree: numpy ndarray containing the price evolution
+
+    Methods
+    ----------
+    calculate_price() 
+    """
     def __init__(self, name: str, maturity: int, face_value: float, coupon_rate: float, coupon_dates: list, model: BinomialModel):
         super().__init__(name, model)
         self.maturity = maturity
@@ -100,7 +169,6 @@ class PlainCouponBond(Derivative):
         self.coupon_rate = coupon_rate
         self.coupon_dates = coupon_dates
         self.coupon = self.coupon_rate * self.face_value
-        self.price_tree = None
 
     def calculate_price(self) -> float:
         prices = np.zeros((self.maturity + 1, self.maturity + 1))
@@ -111,7 +179,8 @@ class PlainCouponBond(Derivative):
         for coupon in coupons:
             coupon.calculate_price()
             tmp = coupon.price_tree
-            tmp[-1,:] = 0               # Mask the prices at maturity (in order to get the ex-coupon prices). Comment this line in order to get cum-coupon prices.
+            # Mask the prices at maturity (in order to get the ex-coupon prices). Comment this line in order to get cum-coupon prices.
+            tmp[-1,:] = 0   
             prices += np.pad(coupon.price_tree, [(0, prices.shape[0] - coupon.price_tree.shape[0]), (0, prices.shape[1] - coupon.price_tree.shape[1])], mode='constant')
 
         principal = ZeroCouponBond(f"{self.name}-principal-{self.maturity}", self.maturity , self.face_value, self.model)
@@ -123,10 +192,25 @@ class PlainCouponBond(Derivative):
 
 
 class EuropeanOption(Derivative):
+    """ 
+    Class for European options 
+
+    Attributes
+    ----------
+    name: name of the derivative
+    K: strike price of the option
+    model: underlying Binomial Model instance
+    type_: string, either "call" or "put"
+    payoff: payoff function of the option at terminal date, set according to option type
+    price_tree: numpy ndarray containing the price evolution
+
+    Methods
+    ----------
+    calculate_price() 
+    """
     def __init__(self, name: str, K: float, model: BinomialModel, type_: str): 
         super().__init__(name, model)
         self.K = K
-        self.price_tree = None
         self.type = type_
         if self.type == 'call':
             self.payoff = lambda x: max(0, x - self.K)
@@ -136,6 +220,7 @@ class EuropeanOption(Derivative):
     def calculate_price(self) -> float:
         prices = np.zeros((self.model.T + 1, self.model.T + 1))
         gamma = np.exp(-self.model.r * self.model.delta)
+        # European backward recursion
         for i in range(self.model.T + 1):
             prices[self.model.T][i] = self.payoff(self.model.stock_tree[self.model.T][i])
         for j in range(self.model.T - 1, -1, -1):
@@ -145,6 +230,24 @@ class EuropeanOption(Derivative):
         return self.price_tree[0][0]
 
 class MandatoryConvertibleBond(Derivative):
+    """ 
+    Class for Mandatory Convertible Bond
+
+    Attributes
+    ----------
+    name: name of the derivative
+    alpha: upper conversion constant 
+    beta: lower conversion contant
+    model: underlying Binomial Model instance
+    face_value: face value of the bond
+    coupon_rate: fraction of the principal value
+    coupon_dates: list containing the dates where coupons are paid out
+    price_tree: numpy ndarray containing the price evolution
+
+    Methods
+    ----------
+    calculate_price() 
+    """
     def __init__(self, name: str, alpha: float, beta: float, model: BinomialModel, face_value: float, coupon_rate: float, coupon_dates):
         super().__init__(name, model)
         self.alpha = alpha
@@ -155,13 +258,14 @@ class MandatoryConvertibleBond(Derivative):
         self.call_price_tree = None
         self.put_price_tree = None
         self.bond_price_tree = None
-        self.price_tree = None
 
     def calculate_price(self) -> float:
+        # initialize replicating portfolio
         call = EuropeanOption("call", self.face_value/self.beta, self.model, "call")
         put = EuropeanOption("put", self.face_value/self.alpha, self.model, "put")
         bond = PlainCouponBond("bond", self.model.T, self.face_value, self.coupon_rate, self.coupon_dates, self.model) 
 
+        # pricing
         call.calculate_price()
         put.calculate_price()
         bond.calculate_price()
@@ -170,11 +274,29 @@ class MandatoryConvertibleBond(Derivative):
         self.put_price_tree = put.price_tree
         self.bond_price_tree = bond.price_tree
 
+        # adding up the components (all price_trees are numpy matrices)
         self.price_tree = self.beta * self.call_price_tree - self.alpha * self.put_price_tree + self.bond_price_tree
         return self.price_tree[0][0]
         
 
 class AmericanOption(Derivative):
+    """ 
+    Class for American Option
+
+    Attributes
+    ----------
+    name: name of the derivative
+    model: underlying Binomial Model instance
+    K: strike price of the option
+    payoff: payoff function of the option at terminal date, set according to option type, if not given type should be specified 
+    type_: string, either "call" or "put", if not given payoff matrix should be specified
+    price_tree: numpy ndarray containing the price evolution
+    strategies: 0-1 numpy ndarray containing the optimal exercise strategy
+
+    Methods
+    ----------
+    calculate_price() 
+    """
     def __init__(self, name: str, model: BinomialModel, K: float = 0, payoff: np.ndarray = np.empty(0), type_: str = ""):
         super().__init__(name, model)
         self.price_tree = None
@@ -194,11 +316,14 @@ class AmericanOption(Derivative):
     def calculate_price(self) -> float:
         prices = np.zeros((self.model.T + 1, self.model.T + 1))
         gamma = np.exp(-self.model.r * self.model.delta)
+        # American backward recursion
         prices[self.model.T] = self.payoff[self.model.T]
         for j in range(self.model.T - 1, -1, -1):
             for i in range(0, j + 1):
                 continuation = gamma * (self.model.risk_neutral_up * prices[j + 1][i + 1] + self.model.risk_neutral_down * prices[j + 1][i])
                 prices[j][i] = max(continuation, self.payoff[j][i])
+
+                # saving the optimal exercise strategy
                 if self.payoff[j][i]>continuation: 
                     self.strategies[j,i]=1
 
@@ -206,6 +331,26 @@ class AmericanOption(Derivative):
         return self.price_tree[0][0]
 
 class ConvertibleBond(Derivative): 
+    """ 
+    Class for vanilla Convertible Bond
+
+    Attributes
+    ----------
+    name: name of the derivative
+    model: underlying Binomial Model instance
+    face_value: face value of the bond
+    coupon_rate: fraction of the principal value
+    coupon_dates: list containing the dates where coupons are paid out
+    gamma: conversion rate
+    american_price_tree: price tree of the replicating american derivative
+    bond_price_tree: price tree of the replicating bond
+    price_tree: numpy ndarray containing the price evolution
+    strategies: 0-1 numpy ndarray containing the optimal exercise strategy
+
+    Methods
+    ----------
+    calculate_price() 
+    """
     def __init__(self, name: str,  model: BinomialModel, face_value: float, coupon_rate: float, coupon_dates, gamma: float):
         super().__init__(name, model)
         self.face_value = face_value
@@ -214,17 +359,18 @@ class ConvertibleBond(Derivative):
         self.gamma = gamma
         self.american_price_tree = None
         self.bond_price_tree = None
-        self.price_tree = None
         self.strategies = np.zeros((self.model.T + 1, self.model.T + 1))
 
     def calculate_price(self) -> float:
-        # calculate payoff
+        # calculate payoff at terminal date
         payoff = np.zeros((self.model.T + 1, self.model.T + 1)) 
         payoff[self.model.T] = np.maximum(self.gamma * self.model.stock_tree[self.model.T] - np.ones(self.model.T + 1) * self.face_value,0)
 
+        # replicating bond
         bond = PlainCouponBond("bond", self.model.T, self.face_value, self.coupon_rate, self.coupon_dates, self.model)
         bond.calculate_price()
 
+        # payoff function for the american derivative using the bond and stock prices
         for j in range(self.model.T - 1, -1, -1):
             for i in range(0, j + 1):
                 if j in self.coupon_dates:
@@ -233,13 +379,14 @@ class ConvertibleBond(Derivative):
                     payoff[j][i] = 0
 
 
-
+        # define the underlying American option for the replicating potfolio
         american = AmericanOption("am", self.model, payoff=payoff)
         american.calculate_price()      
 
         self.american_price_tree = american.price_tree
         self.bond_price_tree = bond.price_tree
 
+        # saving optimal exercise strategy
         self.strategies=american.strategies
 
         # calculate price
@@ -248,12 +395,26 @@ class ConvertibleBond(Derivative):
 
 
 class action:
+    """"
+    Helper class to save the optimal exercise strategy for callable convertible bonds
+
+    Attributes
+    ----------
+    date: date of the action
+    actor: executor of the action: bondholder, issuer or both
+    stock_value: current value of the stock
+
+    Methods
+    ----------
+    describe()
+    """
     def __init__(self, date: int, actor: str, stock_value: float):
         self.date = date
         self.actor = actor
         self.stock_value = stock_value
     
     def describe(self) -> str:
+        """ describe the optimal action of the actor (bondholder or issuer), print out the results on terminal"""
         description = "\nAt date t = {0}, if the share price S_t = {1}\n".format(self.date, self.stock_value)
         if (self.actor == "both"):
             description += "   The issuer should call the bond and the bondholder should exercise the conversion option.\n"
@@ -265,14 +426,35 @@ class action:
 
 
 class callableCB(Derivative):
+    """ 
+    Class for callable Convertible Bond
+
+    Attributes
+    ----------
+    name: name of the derivative
+    model: underlying Binomial Model instance
+    face_value: face value of the bond
+    coupon_rate: fraction of the principal value
+    coupon_dates: list containing the dates where coupons are paid out
+    gamma: conversion rate
+    call_price: issuer can buy back the bond at this price
+    price_tree: numpy ndarray containing the price evolution
+    strategies: list of optimal actions describing the optimal exercise strategies
+    strategies2: 0-1 numpy ndarray containing the optimal exercise strategy
+
+    Methods
+    ----------
+    calculate_price() 
+    describe_strategies()
+    question_5_3()
+    """
     def __init__(self, name: str,  model: BinomialModel, face_value: float, coupon_rate: float, coupon_dates: list, gamma: float, call_price: float):
         super().__init__(name, model)
         self.face_value = face_value
         self.coupon_rate = coupon_rate
         self.coupon_dates = coupon_dates
-        self.gamma = gamma                                                                              # Conversion rate.
+        self.gamma = gamma                                                                              
         self.call_price = call_price
-        self.price_tree = None
         self.strategies = []
         self.strategies2 = np.zeros((self.model.T + 1, self.model.T + 1))
 
@@ -285,7 +467,7 @@ class callableCB(Derivative):
 
             if (self.face_value > max(self.gamma*S_T, self.call_price)):
                 price = max(self.gamma*S_T, self.call_price) 
-                self.price_tree[self.model.T][i] = price                                                # Update price tree.
+                self.price_tree[self.model.T][i] = price   # Update price tree.
 
                 # Update strategies list.
                 if price == self.gamma*S_T:     
@@ -304,6 +486,7 @@ class callableCB(Derivative):
                     self.strategies2[self.model.T][i] = 1
         
         gamma = np.exp(-self.model.r * self.model.delta)
+        # Backward recursion
         for i in range(self.model.T - 1, -1, -1):
             coupon_i = self.coupon_rate * self.face_value if ((i + 1) in self.coupon_dates) else 0   
             for j in range(0, i + 1):
@@ -390,6 +573,7 @@ class callableCB(Derivative):
         return self.price_tree[0][0]
         
     def describe_strategies(self) -> str:
+        """prints out optimal strategies, wrapper function around action.describe()"""
         descriptions = '\n\nN.B. In principle, only the first occurrence (of the exercise of the call and/or conversion option) should be taken into account. '
         descriptions += 'However, we list "subsequent" strategies, in case the first one is not followed (e.g. case where the bondholder decided to continue, even if it was not the optimal decision).\n'
         for i in range(len(self.strategies)-1, -1, -1):
@@ -398,6 +582,7 @@ class callableCB(Derivative):
         return descriptions
 
     def question_5_3(self) -> str:
+        """helper function to describe optimal strategy only in the asked intervals"""
         descriptions = ""
         for i in range(len(self.strategies)-1, -1, -1):
             if self.strategies[i].date in [6, 12, 18]:
@@ -408,14 +593,16 @@ class callableCB(Derivative):
 
 if __name__ == "__main__":
     np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
-    model = BinomialModel(name="Lecture6", delta=1, T=1, r=np.log(1.25), S_0=4, dividend_dates=[], dividend_yield=0.25, U=2, D=1/2)
+    model = BinomialModel(name="Lecture6", delta=1, T=2, r=np.log(1.25), S_0=4, dividend_dates=[], dividend_yield=0.25, U=2, D=1/2)
     model.calculate_risk_neutral_probabilities()
     model.calculate_stock_tree()
     model.calculate_riskless_tree()
     
     mCB = MandatoryConvertibleBond('',alpha=100,beta=5,model=model,face_value=20, coupon_rate=0.02, coupon_dates=[1]) 
     print(mCB.calculate_price())
-    print(mCB.price_tree)
+
+
+    print(model.stock_tree)
 
     #Question 5.1.
     #mCB = MandatoryConvertibleBond('', model=model, alpha=ALPHA, beta=BETA, face_value=F, coupon_rate=COUPON_RATE, coupon_dates=[6, 12, 18, 24, 30, 36, 42, 48, 54, 60])
