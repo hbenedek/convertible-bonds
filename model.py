@@ -188,6 +188,7 @@ class AmericanOption(Derivative):
             self.payoff = np.vectorize(put)(self.model.stock_tree)
         else:
             self.payoff = payoff
+        self.strategies = np.zeros((self.model.T + 1, self.model.T + 1))
 
 
     def calculate_price(self) -> float:
@@ -198,6 +199,8 @@ class AmericanOption(Derivative):
             for i in range(0, j + 1):
                 continuation = gamma * (self.model.risk_neutral_up * prices[j + 1][i + 1] + self.model.risk_neutral_down * prices[j + 1][i])
                 prices[j][i] = max(continuation, self.payoff[j][i])
+                if self.payoff[j][i]>continuation: 
+                    self.strategies[j,i]=1
 
         self.price_tree = prices
         return self.price_tree[0][0]
@@ -212,6 +215,7 @@ class ConvertibleBond(Derivative):
         self.american_price_tree = None
         self.bond_price_tree = None
         self.price_tree = None
+        self.strategies = np.zeros((self.model.T + 1, self.model.T + 1))
 
     def calculate_price(self) -> float:
         # calculate payoff
@@ -223,7 +227,11 @@ class ConvertibleBond(Derivative):
 
         for j in range(self.model.T - 1, -1, -1):
             for i in range(0, j + 1):
-                payoff[j][i] = self.gamma*self.model.stock_tree[j][i] - bond.price_tree[j][i]
+                if j in self.coupon_dates:
+                    payoff[j][i] = self.gamma*self.model.stock_tree[j][i] - bond.price_tree[j][i]
+                else: 
+                    payoff[j][i] = 0
+
 
 
         american = AmericanOption("am", self.model, payoff=payoff)
@@ -231,6 +239,8 @@ class ConvertibleBond(Derivative):
 
         self.american_price_tree = american.price_tree
         self.bond_price_tree = bond.price_tree
+
+        self.strategies=american.strategies
 
         # calculate price
         self.price_tree = self.american_price_tree + self.bond_price_tree
@@ -264,6 +274,7 @@ class callableCB(Derivative):
         self.call_price = call_price
         self.price_tree = None
         self.strategies = []
+        self.strategies2 = np.zeros((self.model.T + 1, self.model.T + 1))
 
     def calculate_price(self) -> float:
         self.price_tree = np.zeros((self.model.T + 1, self.model.T + 1))
@@ -277,14 +288,20 @@ class callableCB(Derivative):
                 self.price_tree[self.model.T][i] = price                                                # Update price tree.
 
                 # Update strategies list.
-                if price == self.gamma*S_T:     self.strategies.append(action(self.model.T, "both", S_T))
-                else:                           self.strategies.append(action(self.model.T, "issuer", S_T))
+                if price == self.gamma*S_T:     
+                    self.strategies.append(action(self.model.T, "both", S_T))
+                    self.strategies2[self.model.T][i] = 3
+                else:                           
+                    self.strategies.append(action(self.model.T, "issuer", S_T))
+                    self.strategies2[self.model.T][i] = 2
             else:
                 price = max(self.gamma*S_T, self.face_value)
                 self.price_tree[self.model.T][i] = price
 
                 # Update strategies list.
-                if price == self.gamma*S_T:     self.strategies.append(action(self.model.T, "bondholder", S_T))
+                if price == self.gamma*S_T:     
+                    self.strategies.append(action(self.model.T, "bondholder", S_T))
+                    self.strategies2[self.model.T][i] = 1
         
         for i in range(self.model.T - 1, -1, -1):
             coupon_i = self.coupon_rate*self.face_value if ((i+1) in self.coupon_dates) else 0          # Coupon payment at date j.
@@ -297,14 +314,20 @@ class callableCB(Derivative):
                     price = max(self.gamma*S_i, self.call_price)
                     self.price_tree[i][j] = price
 
-                    if price == self.gamma*S_i: self.strategies.append(action(i, "both", S_i))
-                    else:                       self.strategies.append(action(i, "issuer", S_i))
+                    if price == self.gamma*S_i: 
+                        self.strategies.append(action(i, "both", S_i))
+                        self.strategies2[i][j] = 3
+                    else:                       
+                        self.strategies.append(action(i, "issuer", S_i))
+                        self.strategies2[i][j] = 2
 
                 else:
                     price = max(self.gamma*S_i, C_i)
                     self.price_tree[i][j] = price
                     
-                    if price == self.gamma*S_i:     self.strategies.append(action(i, "bondholder", S_i))
+                    if price == self.gamma*S_i:     
+                        self.strategies.append(action(i, "bondholder", S_i))
+                        self.strategies2[i][j] = 1
 
         return self.price_tree[0][0]
         
