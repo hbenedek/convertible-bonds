@@ -73,7 +73,7 @@ class Test(unittest.TestCase):
 
         cCB = callableCB('test_cCB', model=model, face_value=20, coupon_rate=0.02, coupon_dates=[1,2], gamma=10, call_price=21)
         B0 = cCB.calculate_price()
-        self.assertEqual(B0, 40)
+        self.assertEqual(B0, 32.448)
 
 if __name__ == '__main__':
     unittest.main()

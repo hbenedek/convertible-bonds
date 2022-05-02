@@ -220,7 +220,7 @@ class ConvertibleBond(Derivative):
     def calculate_price(self) -> float:
         # calculate payoff
         payoff = np.zeros((self.model.T + 1, self.model.T + 1)) 
-        payoff[self.model.T] = self.gamma * self.model.stock_tree[self.model.T] - np.ones(self.model.T + 1) * self.face_value
+        payoff[self.model.T] = np.maximum(self.gamma * self.model.stock_tree[self.model.T] - np.ones(self.model.T + 1) * self.face_value,0)
 
         bond = PlainCouponBond("bond", self.model.T, self.face_value, self.coupon_rate, self.coupon_dates, self.model)
         bond.calculate_price()
@@ -277,6 +277,64 @@ class callableCB(Derivative):
         self.strategies2 = np.zeros((self.model.T + 1, self.model.T + 1))
 
     def calculate_price(self) -> float:
+        self.price_tree = np.zeros((self.model.T + 1, self.model.T + 1))
+
+        # Calculate payoff at maturity
+        for i in range(self.model.T + 1):
+            S_T = self.model.stock_tree[self.model.T][i]
+
+            if (self.face_value > max(self.gamma*S_T, self.call_price)):
+                price = max(self.gamma*S_T, self.call_price) 
+                self.price_tree[self.model.T][i] = price                                                # Update price tree.
+
+                # Update strategies list.
+                if price == self.gamma*S_T:     
+                    self.strategies.append(action(self.model.T, "both", S_T))
+                    self.strategies2[self.model.T][i] = 3
+                else:                           
+                    self.strategies.append(action(self.model.T, "issuer", S_T))
+                    self.strategies2[self.model.T][i] = 2
+            else:
+                price = max(self.gamma*S_T, self.face_value)
+                self.price_tree[self.model.T][i] = price
+
+                # Update strategies list.
+                if price == self.gamma*S_T:     
+                    self.strategies.append(action(self.model.T, "bondholder", S_T))
+                    self.strategies2[self.model.T][i] = 1
+        
+        gamma = np.exp(-self.model.r * self.model.delta)
+        for i in range(self.model.T - 1, -1, -1):
+            coupon_i = self.coupon_rate * self.face_value if ((i + 1) in self.coupon_dates) else 0   
+            for j in range(0, i + 1):
+                S_i = self.model.stock_tree[i][j]
+                continuation = gamma * (self.model.risk_neutral_up*self.price_tree[i + 1][j] + self.model.risk_neutral_down * self.price_tree[i + 1][j + 1] + coupon_i)
+                if i in self.coupon_dates:
+                    if continuation > max(self.gamma * S_i, self.call_price):
+                        price = max(self.gamma * S_i, self.call_price)
+                        self.price_tree[i][j] = price
+
+                        if price == self.gamma * S_i: 
+                            self.strategies.append(action(i, "both", S_i))
+                            self.strategies2[i][j] = 3
+                        else:                       
+                            self.strategies.append(action(i, "issuer", S_i))
+                            self.strategies2[i][j] = 2
+                    else:
+                        price = max(self.gamma * S_i, continuation)
+                        self.price_tree[i][j] = price
+                    
+                        if price == self.gamma * S_i:     
+                            self.strategies.append(action(i, "bondholder", S_i))
+                            self.strategies2[i][j] = 1
+
+                else: 
+                    self.price_tree[i][j] = continuation
+
+        return self.price_tree[0][0]
+
+
+    def calculate_price_old(self) -> float:
         self.price_tree = np.zeros((self.model.T + 1, self.model.T + 1))
 
         # Calculate payoff at maturity
