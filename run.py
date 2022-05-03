@@ -185,24 +185,23 @@ if __name__ == "__main__":
     
 
     # Question 5.6.
-    nb_cs = 10
-    nb_call_prices = 10
+    nb_cs = 50
+    nb_call_prices = 20
     cs = np.linspace(0.0, 0.03, num=nb_cs)
-    call_price_rates = np.linspace(1, 1.01, num=nb_call_prices)
+    call_price_rates = np.linspace(1, 3, num=nb_call_prices)
     gammas = np.zeros((nb_cs, nb_call_prices))
     for i, c in enumerate(cs):
         for j, call_price_rate in enumerate(call_price_rates):
-            gammas[i][j] = solve_for_gamma(model, P0, "cCB", 0, 6, 400, c, call_price_rate)
+            gammas[i][j] = solve_for_gamma(model, P0, "cCB", 0, 6, 200, c, call_price_rate)
 
     fig = plt.figure(figsize=(6,5))
     left, bottom, width, height = 0.1, 0.1, 0.8, 0.8
     ax = fig.add_axes([left, bottom, width, height]) 
 
     X, Y = np.meshgrid(cs, call_price_rates)
-    cp = plt.contourf(X, Y, gammas)
+    cp = plt.contourf(X, Y, gammas.T)
     plt.colorbar(cp)
 
     ax.set_xlabel(r'Coupon rate $c$')
     ax.set_ylabel(r'Call price rate $\frac{F_c}{F}$')
     plt.show()
-    plt.savefig('results/Analysis_5_6_1.png', dpi=200)
