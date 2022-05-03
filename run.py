@@ -51,7 +51,7 @@ def solve_for_gamma(stock_model: BinomialModel, P0: float, type_bond: str, gamma
 
 if __name__ == "__main__":
     np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
-    model = BinomialModel(name="Lecture4", delta=1/12, T=60, r=0.05, S_0=175, dividend_dates=[12, 24, 36, 48, 60], dividend_yield=0.0287, U=1.0957, D=0.9127)
+    model = BinomialModel(name="Johnson", delta=1/12, T=60, r=0.05, S_0=175, dividend_dates=[12, 24, 36, 48, 60], dividend_yield=0.0287, U=1.0957, D=0.9127)
     model.calculate_risk_neutral_probabilities()
     model.check_arbitrage()
     model.calculate_stock_tree()
@@ -185,26 +185,24 @@ if __name__ == "__main__":
     
 
     # Question 5.6.
-    # nb_cs = 10
-    # nb_call_prices = 10
-    # cs = np.linspace(0.01, 0.99, num=nb_cs)
-    # call_price_rates = np.linspace(0.8, 10, num=nb_call_prices)
-    # gammas = np.zeros((nb_cs, nb_call_prices))
-    # for i, c in enumerate(cs):
-    #     TODO: add code for other bonds outside the second for loop.
+    nb_cs = 10
+    nb_call_prices = 10
+    cs = np.linspace(0.0, 0.03, num=nb_cs)
+    call_price_rates = np.linspace(1, 1.01, num=nb_call_prices)
+    gammas = np.zeros((nb_cs, nb_call_prices))
+    for i, c in enumerate(cs):
+        for j, call_price_rate in enumerate(call_price_rates):
+            gammas[i][j] = solve_for_gamma(model, P0, "cCB", 0, 6, 400, c, call_price_rate)
 
-    #     for j, call_price_rate in enumerate(call_price_rates):
-    #         gammas[i][j] = solve_for_gamma(model, P0, "cCB", 0.01, 30, 100, c, call_price_rate)
+    fig = plt.figure(figsize=(6,5))
+    left, bottom, width, height = 0.1, 0.1, 0.8, 0.8
+    ax = fig.add_axes([left, bottom, width, height]) 
 
-    # fig = plt.figure(figsize =(14, 9))
-    # ax = plt.axes(projection ='3d')
- 
-    # Creating plot
-    #x = np.outer(cs, np.ones(nb_cs))
-    #y = np.outer(call_price_rates, np.ones(nb_call_prices)).T # transpose
-   
-    #ax.plot_surface(x, y, gammas)
-    #ax.set_xlabel("Coupon rate c")
-    #ax.set_ylabel(r"Call price rate $\frac{F_c}{F}$")
-    #ax.set_zlabel(r"Conversion rate $\gamma$")
-    #plt.show()
+    X, Y = np.meshgrid(cs, call_price_rates)
+    cp = plt.contourf(X, Y, gammas)
+    plt.colorbar(cp)
+
+    ax.set_xlabel(r'Coupon rate $c$')
+    ax.set_ylabel(r'Call price rate $\frac{F_c}{F}$')
+    plt.show()
+    plt.savefig('results/Analysis_5_6_1.png', dpi=200)

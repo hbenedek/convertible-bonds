@@ -515,62 +515,6 @@ class callableCB(Derivative):
                     self.price_tree[i][j] = continuation
 
         return self.price_tree[0][0]
-
-
-    def calculate_price_old(self) -> float:
-        self.price_tree = np.zeros((self.model.T + 1, self.model.T + 1))
-
-        # Calculate payoff at maturity
-        for i in range(self.model.T+1):
-            S_T = self.model.stock_tree[self.model.T][i]
-
-            if (self.face_value > max(self.gamma*S_T, self.call_price)):
-                price = max(self.gamma*S_T, self.call_price) 
-                self.price_tree[self.model.T][i] = price                                                # Update price tree.
-
-                # Update strategies list.
-                if price == self.gamma*S_T:     
-                    self.strategies.append(action(self.model.T, "both", S_T))
-                    self.strategies2[self.model.T][i] = 3
-                else:                           
-                    self.strategies.append(action(self.model.T, "issuer", S_T))
-                    self.strategies2[self.model.T][i] = 2
-            else:
-                price = max(self.gamma*S_T, self.face_value)
-                self.price_tree[self.model.T][i] = price
-
-                # Update strategies list.
-                if price == self.gamma*S_T:     
-                    self.strategies.append(action(self.model.T, "bondholder", S_T))
-                    self.strategies2[self.model.T][i] = 1
-        
-        for i in range(self.model.T - 1, -1, -1):
-            coupon_i = self.coupon_rate*self.face_value if ((i+1) in self.coupon_dates) else 0          # Coupon payment at date j.
-            for j in range(i+1):
-                S_i = self.model.stock_tree[i][j]                                                       # i-th value of stock at date j.
-                # Continuation value.
-                C_i = np.exp(-self.model.r * self.model.delta)*(self.model.risk_neutral_up*self.price_tree[i+1][j] + self.model.risk_neutral_down*self.price_tree[i+1][j+1] + coupon_i)
-
-                if ((i in self.coupon_dates) and (C_i > max(self.gamma*S_i, self.call_price))):
-                    price = max(self.gamma*S_i, self.call_price)
-                    self.price_tree[i][j] = price
-
-                    if price == self.gamma*S_i: 
-                        self.strategies.append(action(i, "both", S_i))
-                        self.strategies2[i][j] = 3
-                    else:                       
-                        self.strategies.append(action(i, "issuer", S_i))
-                        self.strategies2[i][j] = 2
-
-                else:
-                    price = max(self.gamma*S_i, C_i)
-                    self.price_tree[i][j] = price
-                    
-                    if price == self.gamma*S_i:     
-                        self.strategies.append(action(i, "bondholder", S_i))
-                        self.strategies2[i][j] = 1
-
-        return self.price_tree[0][0]
         
     def describe_strategies(self) -> str:
         """prints out optimal strategies, wrapper function around action.describe()"""
@@ -589,30 +533,4 @@ class callableCB(Derivative):
                 descriptions += self.strategies[i].describe()
         
         return descriptions
-
-
-if __name__ == "__main__":
-    np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
-    model = BinomialModel(name="Lecture6", delta=1, T=2, r=np.log(1.25), S_0=4, dividend_dates=[], dividend_yield=0.25, U=2, D=1/2)
-    model.calculate_risk_neutral_probabilities()
-    model.calculate_stock_tree()
-    model.calculate_riskless_tree()
-    
-    mCB = MandatoryConvertibleBond('',alpha=100,beta=5,model=model,face_value=20, coupon_rate=0.02, coupon_dates=[1]) 
-    print(mCB.calculate_price())
-
-
-    print(model.stock_tree)
-
-    #Question 5.1.
-    #mCB = MandatoryConvertibleBond('', model=model, alpha=ALPHA, beta=BETA, face_value=F, coupon_rate=COUPON_RATE, coupon_dates=[6, 12, 18, 24, 30, 36, 42, 48, 54, 60])
-    #print(mCB.calculate_price())
-
-    #CB = ConvertibleBond('', model=model, face_value=F, coupon_rate=COUPON_RATE, coupon_dates=[6, 12, 18, 24, 30, 36, 42, 48, 54, 60], gamma=GAMMA) 
-    #print(CB.calculate_price())
-
-    #cCB = callableCB('', model=model, face_value=F, coupon_rate=COUPON_RATE, coupon_dates=[6, 12, 18, 24, 30, 36, 42, 48, 54, 60], gamma=GAMMA, call_price=F_C)
-    #B0 = cCB.calculate_price()
-    #print(B0)
-
    
