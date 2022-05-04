@@ -20,12 +20,14 @@ In order to reproduce our results for the Analysis (Part 5) one should just run 
 `model.py` contains our implementation of the BinomialModel along with intermediate calculations of the evolution of the risky asset, the calculation of the EMM probabilities and arbitrage checking. In order to initialize a BM, one should instantiate a BM object with its parameters. This instance is then passed to the corresponding derivative. All derivatives are implemented in the same file as well. A derivative should have an underlying model and a function calculate_price() which returns the price as of today and sets the class attribute price_tree to a np.ndarray matrix, representing the price at different nodes of the BM. We implemented the pricing of simple derivatives (Zero Coupon Bonds, Vanilla Bonds, European Options and American Options ), which we can use as building blocks for pricing more complicated securities such as Mandatory Convertible Bonds, (vanilla) Convertible Bonds and Callable Convertible Bonds. For each derivative we tested the correctness of our implementations in `test.py`.
 
 <pre>  
-├─── run.py : standalone executable produces answers for Analysis (Part5)
+├─── results : Folder containing plots
+├─── run.py : Standalone executable produces answers for Analysis (Part5)
 ├─── model.py : Binomial model and Derivative class implementations 
 ├─── test.py : Pricing tests of the different derivative classes
 ├─── calibration.py : Binomial Model calibration based on J&J historical data
 ├─── data.txt : Historical data on Johnson & Johnson option prices
 ├─── README.md 
-├─── .gitignore  
+├─── .gitignore 
+├─── report.pdf : Our report for the project
 └─── description.pdf : Contains all specifications and questions of the project
 </pre>
