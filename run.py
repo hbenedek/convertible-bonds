@@ -76,27 +76,27 @@ if __name__ == "__main__":
     mask[np.triu_indices_from(mask, k=1)] = True
 
     ax = sns.heatmap(strat, mask = mask, vmin=-0.5, vmax=3, cmap="YlGnBu", linewidths=.5, cbar=False)
-    ax.figure.savefig('heatmap.png')
+    ax.figure.savefig('results/heatmap.png')
 
-    for i in range(19):
-        for j in range(19): 
-            if strat[i,j]==1: 
-                print(f'i:{i},j:{j}:: {model.stock_tree[i,j]}')
+    # for i in range(19):
+    #     for j in range(19): 
+    #         if strat[i,j]==1: 
+    #             print(f'i:{i},j:{j}:: {model.stock_tree[i,j]}')
 
 
     # Question 5.3.
-    print(cCB.strategies2)
+    # print(cCB.strategies2)
     strat_call = cCB.strategies2[:19,:19]
     mask = np.zeros_like(strat_call)
     mask[np.triu_indices_from(mask, k=1)] = True
 
     ax = sns.heatmap(strat_call, mask = mask, vmin=-0.5, cmap="YlGnBu", linewidths=.5, cbar=False)
-    ax.figure.savefig('heatmap2.png')
+    ax.figure.savefig('results/heatmap2.png')
 
-    for i in range(19):
-        for j in range(19): 
-            if strat_call[i,j]==1: 
-                print(f'i:{i},j:{j}:: {model.stock_tree[i,j]}')
+    # for i in range(19):
+    #     for j in range(19): 
+    #         if strat_call[i,j]==1: 
+    #             print(f'i:{i},j:{j}:: {model.stock_tree[i,j]}')
     
     #print(cCB.question_5_3())
  
@@ -185,6 +185,35 @@ if __name__ == "__main__":
     
 
     # Question 5.6.
+
+    ## Vanilla CB
+
+    P0 = 1000
+    nb_coupons = 200
+
+    # # Par coupon for plain coupon bond
+    # price_cb = np.zeros(200)
+    # for i, c in enumerate(np.linspace(0, 0.03, nb_coupons)):
+    #    price_cb[i] = PlainCouponBond("couponbond", T, F, c, COUPON_DATES, model).calculate_price()   
+    # couponbond_parplace = np.argmin(np.abs(price_cb - P0))
+    # couponbond_parcoupon = (np.linspace(0, 0.03, 200)[couponbond_parplace])
+
+    coupons = np.linspace(0, 0.0254, num=nb_coupons)
+
+    gammas_cb = np.zeros(nb_coupons)
+    for i, c in enumerate(coupons):
+        gammas_cb[i] = solve_for_gamma(model, P0, "CB", 0.01, 5, 100, c, call_price_rate)
+
+    ax2 = sns.scatterplot(x = coupons, y = gammas_cb)
+    ax2.set_xlabel("Coupon rate (c)")
+    ax2.set_ylabel("Conversion rate (gamma)")
+    ax2.xaxis.set_tick_params(labelsize=18)
+    ax2.yaxis.set_tick_params(labelsize=18)
+    ax2.grid()
+    ax2.figure.savefig('results/cb_coupons.png', dpi=200)
+
+    ## Callable CB
+
     nb_cs = 50
     nb_call_prices = 20
     cs = np.linspace(0.0, 0.03, num=nb_cs)
@@ -204,4 +233,5 @@ if __name__ == "__main__":
 
     ax.set_xlabel(r'Coupon rate $c$')
     ax.set_ylabel(r'Call price rate $\frac{F_c}{F}$')
+    ax.figure.savefig('results/ccb_coupons.png', dpi=200)
     plt.show()
